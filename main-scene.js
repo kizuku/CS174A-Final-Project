@@ -12,6 +12,7 @@ const { Vector, Vector3, vec, vec3, vec4, color, Matrix, Mat4, Light, Shape, Mat
     //                      as common.js into one file for you, such as "dependencies.js")
 
 const Minimal_Webgl_Demo = defs.Minimal_Webgl_Demo;
+
 import { Axes_Viewer, Axes_Viewer_Test_Scene } 
   from "./examples/axes-viewer.js"
 import { Inertia_Demo, Collision_Demo }
@@ -28,6 +29,7 @@ import { Text_Demo }
   from "./examples/text-demo.js"
 import { Transforms_Sandbox }
   from "./examples/transforms-sandbox.js"
+import { FinalProject } from "./final.js"
 
 Object.assign( defs,
                      { Axes_Viewer, Axes_Viewer_Test_Scene },
@@ -37,13 +39,14 @@ Object.assign( defs,
                      { Scene_To_Texture_Demo },
                      { Surfaces_Demo },
                      { Text_Demo },
-                     { Transforms_Sandbox } );
+                     { Transforms_Sandbox },
+                     { FinalProject } );
 
     // ******************** End extra step
 
 // (Can define Main_Scene's class here)
 
-const Main_Scene = Transforms_Sandbox;
+const Main_Scene = FinalProject;
 const Additional_Scenes = [];
 
 export { Main_Scene, Additional_Scenes, Canvas_Widget, Code_Widget, Text_Widget, defs }
