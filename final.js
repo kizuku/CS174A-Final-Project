@@ -1,49 +1,88 @@
 import {defs, tiny} from "./examples/common.js";
 
 const{
-    Vector, Vector3, vec, vec3, vec4, color, Shader, Matrix, Mat4, Light, Shape, Material, Scene,
+    Vector, Vector3, vec, vec3, vec4, color, Shader, Matrix, Mat4, Light, Shape, Material, Scene, Texture,
 } = tiny;
+
+export class Text_Line extends Shape                
+{                           // **Text_Line** embeds text in the 3D world, using a crude texture 
+                            // method.  This Shape is made of a horizontal arrangement of quads.
+                            // Each is textured over with images of ASCII characters, spelling 
+                            // out a string.  Usage:  Instantiate the Shape with the desired
+                            // character line width.  Then assign it a single-line string by calling
+                            // set_string("your string") on it. Draw the shape on a material
+                            // with full ambient weight, and text.png assigned as its texture 
+                            // file.  For multi-line strings, repeat this process and draw with
+                            // a different matrix.
+  constructor( max_size )
+    { super( "position", "normal", "texture_coord" );
+      this.max_size = max_size;
+      var object_transform = Mat4.identity();
+      for( var i = 0; i < max_size; i++ )
+      {                                       // Each quad is a separate Square instance:
+        defs.Square.insert_transformed_copy_into( this, [], object_transform );
+        object_transform.post_multiply( Mat4.translation( 1.5,0,0 ) );
+      }
+    }
+  set_string( line, context )
+    {           // set_string():  Call this to overwrite the texture coordinates buffer with new 
+                // values per quad, which enclose each of the string's characters.
+      this.arrays.texture_coord = [];
+      for( var i = 0; i < this.max_size; i++ )
+        {
+          var row = Math.floor( ( i < line.length ? line.charCodeAt( i ) : ' '.charCodeAt() ) / 16 ),
+              col = Math.floor( ( i < line.length ? line.charCodeAt( i ) : ' '.charCodeAt() ) % 16 );
+
+          var skip = 3, size = 32, sizefloor = size - skip;
+          var dim = size * 16,  
+              left  = (col * size + skip) / dim,      top    = (row * size + skip) / dim,
+              right = (col * size + sizefloor) / dim, bottom = (row * size + sizefloor + 5) / dim;
+
+          this.arrays.texture_coord.push( ...Vector.cast( [ left,  1-bottom], [ right, 1-bottom ],
+                                                          [ left,  1-top   ], [ right, 1-top    ] ) );
+        }
+      if( !this.existing )
+        { this.copy_onto_graphics_card( context );
+          this.existing = true;
+        }
+      else
+        this.copy_onto_graphics_card( context, ["texture_coord"], false );
+    }
+}
 
 export class FinalProject extends Scene {
     constructor() {
         super();
 
         this.shapes = {
-            torus: new defs.Torus(15, 15),
             sphere: new defs.Subdivision_Sphere(4),
-            circle: new defs.Regular_2D_Polygon(1, 15),
-            cube: new defs.Cube()
+            cube: new defs.Cube(),
+            text: new Text_Line(35)
         };
 
         this.materials = {
             test: new Material(new defs.Phong_Shader(),
                 {ambient: .4, diffusivity: .6, color: color(1,1,1,1)}),
-            test2: new Material(new Gouraud_Shader(),
-                {ambient: .4, diffusivity: .6, color: color(0.6, .15, .15)}),
-            ring: new Material(new Ring_Shader())
+            text_image: new Material(new defs.Textured_Phong(), { ambient: 1, diffusivity: 0, specularity: 0,  texture: new Texture( "assets/text.png" ) })
         }
 
-        this.initial_camera_location = Mat4.look_at(vec3(0, 10, 20), vec3(0, 0, 0), vec3(0, 1, 0));
+        this.initial_camera_location = Mat4.look_at(vec3(0, 10, 25), vec3(0, 0, 0), vec3(0, 1, 0));
+        this.score = 0;
+        this.counter = 0;
+        this.playing = 0;
     }
 
     make_control_panel() {
         // Draw the scene's buttons, setup their actions and keyboard shortcuts, and monitor live measurements.
-        this.key_triggered_button("View solar system", ["Control", "0"], () => this.attached = () => this.initial_camera_location);
-        this.new_line();
-        this.key_triggered_button("Attach to planet 1", ["Control", "1"], () => this.attached = () => this.planet_1);
-        this.key_triggered_button("Attach to planet 2", ["Control", "2"], () => this.attached = () => this.planet_2);
-        this.new_line();
-        this.key_triggered_button("Attach to planet 3", ["Control", "3"], () => this.attached = () => this.planet_3);
-        this.key_triggered_button("Attach to planet 4", ["Control", "4"], () => this.attached = () => this.planet_4);
-        this.new_line();
-        this.key_triggered_button("Attach to moon", ["Control", "m"], () => this.attached = () => this.moon);
+        this.key_triggered_button("Start Game", ["c"], () => this.playing ^= 1);
+
     }
 
     display(context, program_state) {
         // display():  Called once per frame of animation.
         // Setup -- This part sets up the scene's overall camera matrix, projection matrix, and lights:
         if (!context.scratchpad.controls) {
-            this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
+            // this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
             // Define the global camera and projection matrices, which are stored in program_state.
             program_state.set_camera(this.initial_camera_location);
         }
@@ -63,8 +102,23 @@ export class FinalProject extends Scene {
 
         this.shapes.sphere.draw(context, program_state, model_transform, this.materials.test.override({color: color(1, 1, 0, 1)}));
 
-        let cube_transform = Mat4.identity().post_multiply(Mat4.translation(0, -3, -20)).post_multiply(Mat4.scale(18, 2, 30));
+        let cube_transform = Mat4.identity().post_multiply(Mat4.translation(0, -3, -5)).post_multiply(Mat4.scale(20, 2, 30));
         this.shapes.cube.draw(context, program_state, cube_transform, this.materials.test.override({color: color(1, 0, 0, 1)}));
+        
+        let scoreboard_transform = Mat4.identity().post_multiply(Mat4.translation(-8, 8, -30));
+        this.shapes.text.set_string("Score: " + this.score.toString(), context.context);
+        this.shapes.text.draw(context, program_state, scoreboard_transform, this.materials.text_image);
+
+        if (this.playing) {
+            this.counter += 1;
+            if (this.counter == 20) {
+                this.counter = 0;
+                this.score += 1;
+            }
+        }
+        else {
+            this.score = 0;
+        }
     }
 }
 
