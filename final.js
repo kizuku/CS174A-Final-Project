@@ -88,6 +88,7 @@ export class FinalProject extends Scene {
 
         this.initial_camera_location = Mat4.look_at(vec3(0, 10, 25), vec3(0, 0, 0), vec3(0, 1, 0));
         this.score = 0;
+        this.highScore = 0;
         this.counter = 0;
         this.playing = 0;
         this.game_start_time;
@@ -135,6 +136,9 @@ export class FinalProject extends Scene {
             this.playing = 0;
             this.threshold = 5;
             this.spawn_cube_interval_decrease = 0;
+            if (this.score > this.highScore) {
+                this.highScore = this.score;
+            }
             return;
         }
 
@@ -408,6 +412,9 @@ export class FinalProject extends Scene {
         let scoreboard_transform = Mat4.identity().post_multiply(Mat4.translation(-5, 8, -30));
         this.shapes.text.set_string("Score: " + this.score.toString(), context.context);
         this.shapes.text.draw(context, program_state, scoreboard_transform, this.materials.text_image);
+
+        this.shapes.text.set_string("High Score: " + this.highScore.toString(), context.context);
+        this.shapes.text.draw(context, program_state, Mat4.identity().post_multiply(Mat4.translation(-5, 5, -30)), this.materials.text_image);
 
         if (this.playing) {
             this.cube_handler(context, program_state, Mat4.identity());
