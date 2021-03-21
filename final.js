@@ -252,7 +252,7 @@ export class FinalProject extends Scene {
             //draw cube
             let cubeImg = this.cubeImg_array[i];
             if (this.special_array[i] == 'g') {
-                this.shapes.cube.draw(context, program_state, new_cube_transform, this.materials.test.override({color: color(1, 1, 0, 1)}));
+                this.shapes.cube.draw(context, program_state, new_cube_transform, this.materials.test.override({color: color(1, 1, 0, 1), specularity: 1.0, ambient: 1.0}));
             }
             else if (cubeImg == 0) {
                 this.shapes.cube.draw(context, program_state, new_cube_transform, this.materials.image1);
