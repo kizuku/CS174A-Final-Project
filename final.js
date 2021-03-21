@@ -117,15 +117,21 @@ export class FinalProject extends Scene {
     }
 
     make_control_panel() {
+        this.control_panel.innerHTML += "<b style='font-size:32px'>DEMETRI BALL</b>";
+        this.new_line();
+        this.control_panel.innerHTML += "<p style = 'font-size: 16px'>Dodge the cubes and grab the golden cubes if possible.</p>"
+        this.new_line();
+        this.new_line();
+
         // Draw the scene's buttons, setup their actions and keyboard shortcuts, and monitor live measurements.
         this.key_triggered_button("Start Game", ["c"], this.game_start);
-        
-
+        this.key_triggered_button("Move Up", ["w"], () => this.move_up = 1, undefined, () => this.move_up = 0);
+        this.new_line();
+    
         //keys for movement_amplitude
         this.key_triggered_button("Move Left", ["a"], () => this.move_left = 1, undefined, () => this.move_left = 0);
-        this.key_triggered_button("Move Right", ["d"], () => this.move_right = 1, undefined, () => this.move_right = 0);
-        this.key_triggered_button("Move Up", ["w"], () => this.move_up = 1, undefined, () => this.move_up = 0);
         this.key_triggered_button("Move Down", ["s"], () => this.move_down = 1, undefined, () => this.move_down = 0);
+        this.key_triggered_button("Move Right", ["d"], () => this.move_right = 1, undefined, () => this.move_right = 0);
     }
 
     game_start() {
@@ -414,7 +420,7 @@ export class FinalProject extends Scene {
         this.shapes.text.draw(context, program_state, scoreboard_transform, this.materials.text_image);
 
         this.shapes.text.set_string("High Score: " + this.highScore.toString(), context.context);
-        this.shapes.text.draw(context, program_state, Mat4.identity().post_multiply(Mat4.translation(-5, 5, -30)), this.materials.text_image);
+        this.shapes.text.draw(context, program_state, Mat4.identity().post_multiply(Mat4.translation(-8, 5, -30)), this.materials.text_image);
 
         if (this.playing) {
             this.cube_handler(context, program_state, Mat4.identity());
