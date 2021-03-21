@@ -63,7 +63,22 @@ export class FinalProject extends Scene {
         this.materials = {
             test: new Material(new defs.Phong_Shader(),
                 {ambient: .4, diffusivity: .6, color: color(1,1,1,1)}),
-            text_image: new Material(new defs.Textured_Phong(), { ambient: 1, diffusivity: 0, specularity: 0,  texture: new Texture( "assets/text.png" ) })
+            text_image: new Material(new defs.Textured_Phong(), { ambient: 1, diffusivity: 0, specularity: 0,  texture: new Texture( "assets/text.png" ) }),
+            image1: new Material(new defs.Textured_Phong(), {
+                color: color(0,0,0, 1),
+                ambient: 1, diffusivity: 0, specularity: 0,
+                texture: new Texture("assets/image1.PNG")
+            }),
+            image2: new Material(new defs.Textured_Phong(), {
+                color: color(0,0,0, 1),
+                ambient: 1, diffusivity: 0, specularity: 0,
+                texture: new Texture("assets/image2.PNG")
+            }),
+            image3: new Material(new defs.Textured_Phong(), {
+                color: color(0,0,0, 1),
+                ambient: 1, diffusivity: 0, specularity: 0,
+                texture: new Texture("assets/image3.PNG")
+            })
         }
 
         this.initial_camera_location = Mat4.look_at(vec3(0, 10, 25), vec3(0, 0, 0), vec3(0, 1, 0));
@@ -71,14 +86,17 @@ export class FinalProject extends Scene {
         this.counter = 0;
         this.playing = 0;
         this.game_start_time;
+        this.threshold = 5;
 
         //cube variables
 
         this.newcube_time = 0.0; //sets the next timestamp when a cube should be spawned
         this.cube_array = []; //stores cube matrixes between displays
         this.cube_size = 1; //CUBE SIZE CONSTANT HERE
+        this.spawn_cube_interval_decrease = 0;
         
         //starting location of the player sphere
+        this.initial_player_position = Mat4.identity().post_multiply(Mat4.translation(0, 0, 10));
         this.player_position = Mat4.identity().post_multiply(Mat4.translation(0, 0, 10));
         this.player_sphere_size = 1;
 
@@ -104,13 +122,19 @@ export class FinalProject extends Scene {
     }
 
     game_start() {
+        this.player_position = Mat4.identity().post_multiply(Mat4.translation(0, 0, 10));
+
         //decided to move this into a function because a number of states have to be reset to make sure everything works between restarting 
         if(this.playing) {
             this.playing = 0;
+            this.threshold = 5;
+            this.spawn_cube_interval_decrease = 0;
             return;
         }
+
         this.playing = 1;
         this.cube_array = []; //emptying the cube array
+        this.cubeImg_array = [];
         this.newcube_time = 0;
         
     }
@@ -121,7 +145,6 @@ export class FinalProject extends Scene {
         //CONSTANTS FOR CUBES
         
         const spawn_cube_interval = 1; //Number of seconds between spawning cubes
-        const spawn_cube_interval_decrease = 0; //TODO maybe, increase cube spawn rate, currently doesn't work
         
         //x bounds for spawning cubes
         const left_spawn_bound = -10;
@@ -136,7 +159,7 @@ export class FinalProject extends Scene {
         const despawn_z = 20; //change this to >20 to avoid the despawn while in frame
         
         const initial_cube_speed = 5; //speed of cubes going down
-        const cube_speed_acceperation = 0.1; //how much faster cubes go per seconds
+        const cube_speed_acceleration = 0.1; //how much faster cubes go per seconds
 
         const t = (program_state.animation_time - this.game_start_time)/1000;
         const dt = program_state.animation_delta_time/1000;
@@ -152,9 +175,23 @@ export class FinalProject extends Scene {
 
             let new_cube_transform = model_transform.post_multiply(Mat4.translation(cube_spawn_location, spawn_y, spawn_z));
             this.cube_array.push(new_cube_transform);
-
+            let randInt = Math.random();
+            if (randInt > 0.7) {
+                this.cubeImg_array.push(0);
+            }
+            else if (randInt > 0.4) {
+                this.cubeImg_array.push(1);
+            }
+            else {
+                this.cubeImg_array.push(2);
+            }
             //increment new cubetime to prepare spawning new cube 
-            this.newcube_time = t + spawn_cube_interval;
+            if (this.score > this.threshold && this.spawn_cube_interval_decrease < 0.7) {
+                this.spawn_cube_interval_decrease += 0.1;
+                this.threshold += 5;
+            }
+
+            this.newcube_time = t + spawn_cube_interval - this.spawn_cube_interval_decrease;
         }
         
 
@@ -165,7 +202,7 @@ export class FinalProject extends Scene {
             //first check collisions, if collided then stop
             if(this.collision_detection(this.player_position, this.cube_array[i])) {
                 //collision detected, abort
-                this.playing = 0;
+                this.game_start();
 
                 //TODO LOSE CONDITION HERE
             }
@@ -175,23 +212,30 @@ export class FinalProject extends Scene {
             new_cube_transform = new_cube_transform.post_multiply(Mat4.scale(this.cube_size, this.cube_size, this.cube_size));
             
             //draw cube
-            this.shapes.cube.draw(context, program_state, new_cube_transform, this.materials.test.override({color: color(1, 1, 0, 1)}));
-            
+            let cubeImg = this.cubeImg_array[i];
+            if (cubeImg == 0) {
+                this.shapes.cube.draw(context, program_state, new_cube_transform, this.materials.image1);
+            }
+            else if (cubeImg == 1) {
+                this.shapes.cube.draw(context, program_state, new_cube_transform, this.materials.image2);                
+            }
+            else {
+                this.shapes.cube.draw(context, program_state, new_cube_transform, this.materials.image3);
+            }
 
             //move the cube for the next loop
-            this.cube_array[i] = this.cube_array[i].post_multiply(Mat4.translation(0,0, (initial_cube_speed + cube_speed_acceperation * t) * dt));
+            this.cube_array[i] = this.cube_array[i].post_multiply(Mat4.translation(0,0, (initial_cube_speed + cube_speed_acceleration * t) * dt));
             
             //delete cube if out of bounds
             //apparently extracting a single element from a matrix is a pain, functionality should really be added to the library 
 
             if(this.cube_array[i][2][3] > despawn_z) {
                 this.cube_array.splice(i, 1); //remove if out of bounds
+                this.cubeImg_array.splice(i, 1);
+                this.score += 1;
             }
             
         }
-        
-
-
     }
 
     move_sphere(program_state) {
@@ -294,8 +338,7 @@ export class FinalProject extends Scene {
 
         //begin placing things
         let model_transform = Mat4.identity();
-        model_transform = model_transform.post_multiply(Mat4.translation(0, 0, 5));
-       
+        model_transform = model_transform.post_multiply(Mat4.translation(0, 0, 5));      
 
         //changed the sphere to spawn based on this.player_position
         //going to move the sphere before anything
@@ -311,206 +354,16 @@ export class FinalProject extends Scene {
 
         if (this.playing) {
             this.cube_handler(context, program_state, Mat4.identity());
-            this.counter += 1; //TODO score currently tied to framerate, please use dt to detach it. 
-            if (this.counter == 20) {
-                this.counter = 0;
-                this.score += 1;
-            }
+//             this.counter += 1; //TODO score currently tied to framerate, please use dt to detach it. 
+//             if (this.counter == 20) {
+//                 this.counter = 0;
+//                 this.score += 1;
+//             }
         }
         else {
             this.score = 0;
             this.game_start_time = program_state.animation_time; //just going to updat the animation_time here until the game starts so we have a start reference
             //has to be done because game_start doesn't have access to program_state unfortunately 
         }
-    }
-}
-
-class Gouraud_Shader extends Shader {
-    // This is a Shader using Phong_Shader as template
-    // TODO: Modify the glsl coder here to create a Gouraud Shader (Planet 2)
-
-    constructor(num_lights = 2) {
-        super();
-        this.num_lights = num_lights;
-    }
-
-    shared_glsl_code() {
-        // ********* SHARED CODE, INCLUDED IN BOTH SHADERS *********
-        return ` 
-        precision mediump float;
-        const int N_LIGHTS = ` + this.num_lights + `;
-        uniform float ambient, diffusivity, specularity, smoothness;
-        uniform vec4 light_positions_or_vectors[N_LIGHTS], light_colors[N_LIGHTS];
-        uniform float light_attenuation_factors[N_LIGHTS];
-        uniform vec4 shape_color;
-        uniform vec3 squared_scale, camera_center;
-
-        // Specifier "varying" means a variable's final value will be passed from the vertex shader
-        // on to the next phase (fragment shader), then interpolated per-fragment, weighted by the
-        // pixel fragment's proximity to each of the 3 vertices (barycentric interpolation).
-        varying vec3 N, vertex_worldspace;
-        varying vec4 vertexColor;
-        // ***** PHONG SHADING HAPPENS HERE: *****                                       
-        vec3 phong_model_lights( vec3 N, vec3 vertex_worldspace ){                                        
-            // phong_model_lights():  Add up the lights' contributions.
-            vec3 E = normalize( camera_center - vertex_worldspace );
-            vec3 result = vec3( 0.0 );
-            for(int i = 0; i < N_LIGHTS; i++){
-                // Lights store homogeneous coords - either a position or vector.  If w is 0, the 
-                // light will appear directional (uniform direction from all points), and we 
-                // simply obtain a vector towards the light by directly using the stored value.
-                // Otherwise if w is 1 it will appear as a point light -- compute the vector to 
-                // the point light's location from the current surface point.  In either case, 
-                // fade (attenuate) the light as the vector needed to reach it gets longer.  
-                vec3 surface_to_light_vector = light_positions_or_vectors[i].xyz - 
-                                               light_positions_or_vectors[i].w * vertex_worldspace;                                             
-                float distance_to_light = length( surface_to_light_vector );
-
-                vec3 L = normalize( surface_to_light_vector );
-                vec3 H = normalize( L + E );
-                // Compute the diffuse and specular components from the Phong
-                // Reflection Model, using Blinn's "halfway vector" method:
-                float diffuse  =      max( dot( N, L ), 0.0 );
-                float specular = pow( max( dot( N, H ), 0.0 ), smoothness );
-                float attenuation = 1.0 / (1.0 + light_attenuation_factors[i] * distance_to_light * distance_to_light );
-                
-                vec3 light_contribution = shape_color.xyz * light_colors[i].xyz * diffusivity * diffuse
-                                                          + light_colors[i].xyz * specularity * specular;
-                result += attenuation * light_contribution;
-            }
-            return result;
-        } `;
-    }
-
-    vertex_glsl_code() {
-        // ********* VERTEX SHADER *********
-        return this.shared_glsl_code() + `
-            attribute vec3 position, normal;                            
-            // Position is expressed in object coordinates.
-            
-            uniform mat4 model_transform;
-            uniform mat4 projection_camera_model_transform;
-    
-            void main(){                                                                   
-                // The vertex's final resting place (in NDCS):
-                gl_Position = projection_camera_model_transform * vec4( position, 1.0 );
-                // The final normal vector in screen space.
-                N = normalize( mat3( model_transform ) * normal / squared_scale);
-                vertex_worldspace = ( model_transform * vec4( position, 1.0 ) ).xyz;
-                // color calculation
-                vec4 color = vec4(shape_color.xyz * ambient, shape_color.w);
-                color.xyz += phong_model_lights(normalize(N), vertex_worldspace);
-                vertexColor = color;
-            } `;
-    }
-
-    fragment_glsl_code() {
-        // ********* FRAGMENT SHADER *********
-        // A fragment is a pixel that's overlapped by the current triangle.
-        // Fragments affect the final image or get discarded due to depth.
-        return this.shared_glsl_code() + `
-            void main(){                                                           
-                // Compute an initial (ambient) color:
-                gl_FragColor = vertexColor;
-            } `;
-    }
-
-    send_material(gl, gpu, material) {
-        // send_material(): Send the desired shape-wide material qualities to the
-        // graphics card, where they will tweak the Phong lighting formula.
-        gl.uniform4fv(gpu.shape_color, material.color);
-        gl.uniform1f(gpu.ambient, material.ambient);
-        gl.uniform1f(gpu.diffusivity, material.diffusivity);
-        gl.uniform1f(gpu.specularity, material.specularity);
-        gl.uniform1f(gpu.smoothness, material.smoothness);
-    }
-
-    send_gpu_state(gl, gpu, gpu_state, model_transform) {
-        // send_gpu_state():  Send the state of our whole drawing context to the GPU.
-        const O = vec4(0, 0, 0, 1), camera_center = gpu_state.camera_transform.times(O).to3();
-        gl.uniform3fv(gpu.camera_center, camera_center);
-        // Use the squared scale trick from "Eric's blog" instead of inverse transpose matrix:
-        const squared_scale = model_transform.reduce(
-            (acc, r) => {
-                return acc.plus(vec4(...r).times_pairwise(r))
-            }, vec4(0, 0, 0, 0)).to3();
-        gl.uniform3fv(gpu.squared_scale, squared_scale);
-        // Send the current matrices to the shader.  Go ahead and pre-compute
-        // the products we'll need of the of the three special matrices and just
-        // cache and send those.  They will be the same throughout this draw
-        // call, and thus across each instance of the vertex shader.
-        // Transpose them since the GPU expects matrices as column-major arrays.
-        const PCM = gpu_state.projection_transform.times(gpu_state.camera_inverse).times(model_transform);
-        gl.uniformMatrix4fv(gpu.model_transform, false, Matrix.flatten_2D_to_1D(model_transform.transposed()));
-        gl.uniformMatrix4fv(gpu.projection_camera_model_transform, false, Matrix.flatten_2D_to_1D(PCM.transposed()));
-
-        // Omitting lights will show only the material color, scaled by the ambient term:
-        if (!gpu_state.lights.length)
-            return;
-
-        const light_positions_flattened = [], light_colors_flattened = [];
-        for (let i = 0; i < 4 * gpu_state.lights.length; i++) {
-            light_positions_flattened.push(gpu_state.lights[Math.floor(i / 4)].position[i % 4]);
-            light_colors_flattened.push(gpu_state.lights[Math.floor(i / 4)].color[i % 4]);
-        }
-        gl.uniform4fv(gpu.light_positions_or_vectors, light_positions_flattened);
-        gl.uniform4fv(gpu.light_colors, light_colors_flattened);
-        gl.uniform1fv(gpu.light_attenuation_factors, gpu_state.lights.map(l => l.attenuation));
-    }
-
-    update_GPU(context, gpu_addresses, gpu_state, model_transform, material) {
-        // update_GPU(): Define how to synchronize our JavaScript's variables to the GPU's.  This is where the shader
-        // recieves ALL of its inputs.  Every value the GPU wants is divided into two categories:  Values that belong
-        // to individual objects being drawn (which we call "Material") and values belonging to the whole scene or
-        // program (which we call the "Program_State").  Send both a material and a program state to the shaders
-        // within this function, one data field at a time, to fully initialize the shader for a draw.
-
-        // Fill in any missing fields in the Material object with custom defaults for this shader:
-        const defaults = {color: color(0, 0, 0, 1), ambient: 0, diffusivity: 1, specularity: 1, smoothness: 40};
-        material = Object.assign({}, defaults, material);
-
-        this.send_material(context, gpu_addresses, material);
-        this.send_gpu_state(context, gpu_addresses, gpu_state, model_transform);
-    }
-}
-
-class Ring_Shader extends Shader {
-    update_GPU(context, gpu_addresses, graphics_state, model_transform, material) {
-        // update_GPU():  Defining how to synchronize our JavaScript's variables to the GPU's:
-        const [P, C, M] = [graphics_state.projection_transform, graphics_state.camera_inverse, model_transform],
-            PCM = P.times(C).times(M);
-        context.uniformMatrix4fv(gpu_addresses.projection_camera_model_transform, false,
-            Matrix.flatten_2D_to_1D(PCM.transposed()));
-    }
-
-    shared_glsl_code() {
-        // ********* SHARED CODE, INCLUDED IN BOTH SHADERS *********
-        return `
-        precision mediump float;
-        varying vec4 point_position;
-        varying vec4 center;
-        `;
-    }
-
-    vertex_glsl_code() {
-        // ********* VERTEX SHADER *********
-        // TODO:  Complete the main function of the vertex shader (Extra Credit Part II).
-        return this.shared_glsl_code() + `
-        attribute vec3 position;
-        uniform mat4 model_transform;
-        uniform mat4 projection_camera_model_transform;
-        
-        void main(){
-          
-        }`;
-    }
-
-    fragment_glsl_code() {
-        // ********* FRAGMENT SHADER *********
-        // TODO:  Complete the main function of the fragment shader (Extra Credit Part II).
-        return this.shared_glsl_code() + `
-        void main(){
-          
-        }`;
     }
 }
