@@ -78,6 +78,11 @@ export class FinalProject extends Scene {
                 color: color(0,0,0, 1),
                 ambient: 1, diffusivity: 0, specularity: 0,
                 texture: new Texture("assets/image3.PNG")
+            }),
+            field: new Material(new defs.Textured_Phong(), {
+                color: color(0,0,0, 1),
+                ambient: 1, diffusivity: 0, specularity: 0,
+                texture: new Texture("assets/field.jpg")
             })
         }
 
@@ -94,6 +99,7 @@ export class FinalProject extends Scene {
         this.cube_array = []; //stores cube matrixes between displays
         this.cube_size = 1; //CUBE SIZE CONSTANT HERE
         this.spawn_cube_interval_decrease = 0;
+        this.special_array = [];
         
         //starting location of the player sphere
         this.initial_player_position = Mat4.identity().post_multiply(Mat4.translation(0, 0, 10));
@@ -135,7 +141,10 @@ export class FinalProject extends Scene {
         this.playing = 1;
         this.cube_array = []; //emptying the cube array
         this.cubeImg_array = [];
+        this.special_array = [];
+        this.fancy = true;
         this.newcube_time = 0;
+        this.goldenSpawned = false;
         
     }
 
@@ -174,7 +183,27 @@ export class FinalProject extends Scene {
             //set the matrix for everything here and put it into our list of cube matricies
 
             let new_cube_transform = model_transform.post_multiply(Mat4.translation(cube_spawn_location, spawn_y, spawn_z));
+            let randSize = 0;
+            if (randSize >= 1) {
+                new_cube_transform.post_multiply(Mat4.scale(5, 1, 1));
+            }
+
             this.cube_array.push(new_cube_transform);
+            if (this.score % 41 == 40 && this.goldenSpawned == false) {
+                this.goldenSpawned = true;
+                this.special_array.push('g');
+            }
+            else if (this.score % 5 == 1 && this.fancy == true) {
+                this.special_array.push('s');
+                this.fancy = false;
+            }
+            else if (this.score % 5 == 1 && this.fancy == false) {
+                this.special_array.push('l');
+                this.fancy = true;
+            }
+            else {
+                this.special_array.push('n');
+            }
             let randInt = Math.random();
             if (randInt > 0.7) {
                 this.cubeImg_array.push(0);
@@ -195,16 +224,20 @@ export class FinalProject extends Scene {
         }
         
 
-        //draw cubes here
+        //draw cubes dw
         var i;
         for(i = 0; i < this.cube_array.length; i++) {
 
             //first check collisions, if collided then stop
-            if(this.collision_detection(this.player_position, this.cube_array[i])) {
+            if(this.collision_detection(this.player_position, this.cube_array[i]) && this.special_array[i] != 'g') {
                 //collision detected, abort
                 this.game_start();
-
-                //TODO LOSE CONDITION HERE
+            }
+            else if (this.collision_detection(this.player_position, this.cube_array[i]) && this.special_array[i] == 'g') {
+                this.score += 100;
+                this.special_array.splice(i, 1);
+                this.cube_array.splice(i, 1);
+                this.cubeImg_array.splice(i, 1);
             }
             let new_cube_transform = this.cube_array[i].copy();
 
@@ -213,7 +246,10 @@ export class FinalProject extends Scene {
             
             //draw cube
             let cubeImg = this.cubeImg_array[i];
-            if (cubeImg == 0) {
+            if (this.special_array[i] == 'g') {
+                this.shapes.cube.draw(context, program_state, new_cube_transform, this.materials.test.override({color: color(1, 1, 0, 1)}));
+            }
+            else if (cubeImg == 0) {
                 this.shapes.cube.draw(context, program_state, new_cube_transform, this.materials.image1);
             }
             else if (cubeImg == 1) {
@@ -224,7 +260,15 @@ export class FinalProject extends Scene {
             }
 
             //move the cube for the next loop
-            this.cube_array[i] = this.cube_array[i].post_multiply(Mat4.translation(0,0, (initial_cube_speed + cube_speed_acceleration * t) * dt));
+            if (this.special_array[i] == 's') {
+                this.cube_array[i] = this.cube_array[i].post_multiply(Mat4.translation(Math.sin(t) * 0.1, 0, (initial_cube_speed + cube_speed_acceleration * t) * dt));
+            }
+            else if (this.special_array[i] == 'l') {
+                this.cube_array[i] = this.cube_array[i].post_multiply(Mat4.translation(((t / 2.) - Math.floor(0.5 + (t / 2.))), 0, (initial_cube_speed + cube_speed_acceleration * t) * dt));
+            }
+            else {
+                this.cube_array[i] = this.cube_array[i].post_multiply(Mat4.translation(0, 0, (initial_cube_speed + cube_speed_acceleration * t) * dt));
+            }
             
             //delete cube if out of bounds
             //apparently extracting a single element from a matrix is a pain, functionality should really be added to the library 
@@ -233,6 +277,7 @@ export class FinalProject extends Scene {
                 this.cube_array.splice(i, 1); //remove if out of bounds
                 this.cubeImg_array.splice(i, 1);
                 this.score += 1;
+                this.special_array.splice(i, 1);
             }
             
         }
@@ -272,6 +317,9 @@ export class FinalProject extends Scene {
         //extract positions for ease of use
         let cube = vec3(cube_matrix[0][3], cube_matrix[1][3], cube_matrix[2][3]);
         let sphere = vec3(sphere_matrix[0][3], sphere_matrix[1][3], sphere_matrix[2][3]);
+
+        console.log(cube_matrix[0][0]);
+        console.log(cube);
 
         //quick and dirty pythagorean theorem here to check if its close enough to require further checks
 
@@ -346,19 +394,14 @@ export class FinalProject extends Scene {
         this.shapes.sphere.draw(context, program_state, this.player_position, this.materials.test.override({color: color(1, 1, 0, 1)}));
 
         let cube_transform = Mat4.identity().post_multiply(Mat4.translation(0, -3, -5)).post_multiply(Mat4.scale(20, 2, 30));
-        this.shapes.cube.draw(context, program_state, cube_transform, this.materials.test.override({color: color(1, 0, 0, 1)}));
+        this.shapes.cube.draw(context, program_state, cube_transform, this.materials.field);
         
-        let scoreboard_transform = Mat4.identity().post_multiply(Mat4.translation(-8, 8, -30));
+        let scoreboard_transform = Mat4.identity().post_multiply(Mat4.translation(-5, 8, -30));
         this.shapes.text.set_string("Score: " + this.score.toString(), context.context);
         this.shapes.text.draw(context, program_state, scoreboard_transform, this.materials.text_image);
 
         if (this.playing) {
             this.cube_handler(context, program_state, Mat4.identity());
-//             this.counter += 1; //TODO score currently tied to framerate, please use dt to detach it. 
-//             if (this.counter == 20) {
-//                 this.counter = 0;
-//                 this.score += 1;
-//             }
         }
         else {
             this.score = 0;
