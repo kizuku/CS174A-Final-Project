@@ -142,7 +142,7 @@ export class FinalProject extends Scene {
         this.cube_array = []; //emptying the cube array
         this.cubeImg_array = [];
         this.special_array = [];
-        this.fancy = true;
+        this.fancy = 0;
         this.newcube_time = 0;
         this.goldenSpawned = false;
         
@@ -193,13 +193,17 @@ export class FinalProject extends Scene {
                 this.goldenSpawned = true;
                 this.special_array.push('g');
             }
-            else if (this.score % 5 == 1 && this.fancy == true) {
+            else if (this.score % 5 == 1 && this.fancy == 0) {
                 this.special_array.push('s');
-                this.fancy = false;
+                this.fancy = 1;
             }
-            else if (this.score % 5 == 1 && this.fancy == false) {
+            else if (this.score % 5 == 1 && this.fancy == 1) {
                 this.special_array.push('l');
-                this.fancy = true;
+                this.fancy = 2;
+            }
+            else if (this.score % 5 == 1 && this.fancy == 2) {
+                this.special_array.push('c');
+                this.fancy = 0;
             }
             else {
                 this.special_array.push('n');
@@ -238,6 +242,7 @@ export class FinalProject extends Scene {
                 this.special_array.splice(i, 1);
                 this.cube_array.splice(i, 1);
                 this.cubeImg_array.splice(i, 1);
+                this.goldenSpawned = false;
             }
             let new_cube_transform = this.cube_array[i].copy();
 
@@ -266,6 +271,9 @@ export class FinalProject extends Scene {
             else if (this.special_array[i] == 'l') {
                 this.cube_array[i] = this.cube_array[i].post_multiply(Mat4.translation(((t / 2.) - Math.floor(0.5 + (t / 2.))), 0, (initial_cube_speed + cube_speed_acceleration * t) * dt));
             }
+            else if (this.special_array[i] == 'c') {
+                this.cube_array[i] = this.cube_array[i].post_multiply(Mat4.translation(Math.sin(t) * 0.1 * Math.sign(Math.sin(2 * Math.PI * t / 2.)), 0, (initial_cube_speed + cube_speed_acceleration * t) * dt));
+            }
             else {
                 this.cube_array[i] = this.cube_array[i].post_multiply(Mat4.translation(0, 0, (initial_cube_speed + cube_speed_acceleration * t) * dt));
             }
@@ -278,6 +286,7 @@ export class FinalProject extends Scene {
                 this.cubeImg_array.splice(i, 1);
                 this.score += 1;
                 this.special_array.splice(i, 1);
+                this.goldenSpawned = false;
             }
             
         }
