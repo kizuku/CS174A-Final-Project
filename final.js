@@ -70,14 +70,209 @@ export class FinalProject extends Scene {
         this.score = 0;
         this.counter = 0;
         this.playing = 0;
+        this.game_start_time;
+
+        //cube variables
+
+        this.newcube_time = 0.0; //sets the next timestamp when a cube should be spawned
+        this.cube_array = []; //stores cube matrixes between displays
+        this.cube_size = 1; //CUBE SIZE CONSTANT HERE
+        
+        //starting location of the player sphere
+        this.player_position = Mat4.identity().post_multiply(Mat4.translation(0, 0, 10));
+        this.player_sphere_size = 1;
+
+        //variables for sphere movement
+        this.movement_amplitude = 7; //how much to move left and right by, would make this a constant but apparently classwide constants dont exist in js for some reason
+        this.move_left = 0;
+        this.move_right = 0;
+        this.move_up = 0;
+        this.move_down = 0;
+
     }
 
     make_control_panel() {
         // Draw the scene's buttons, setup their actions and keyboard shortcuts, and monitor live measurements.
-        this.key_triggered_button("Start Game", ["c"], () => this.playing ^= 1);
+        this.key_triggered_button("Start Game", ["c"], this.game_start);
+        
+
+        //keys for movement_amplitude
+        this.key_triggered_button("Move Left", ["a"], () => this.move_left = 1, undefined, () => this.move_left = 0);
+        this.key_triggered_button("Move Right", ["d"], () => this.move_right = 1, undefined, () => this.move_right = 0);
+        this.key_triggered_button("Move Up", ["w"], () => this.move_up = 1, undefined, () => this.move_up = 0);
+        this.key_triggered_button("Move Down", ["s"], () => this.move_down = 1, undefined, () => this.move_down = 0);
+    }
+
+    game_start() {
+        //decided to move this into a function because a number of states have to be reset to make sure everything works between restarting 
+        if(this.playing) {
+            this.playing = 0;
+            return;
+        }
+        this.playing = 1;
+        this.cube_array = []; //emptying the cube array
+        this.newcube_time = 0;
+        
+    }
+
+
+
+    cube_handler(context, program_state, model_transform) {
+        //CONSTANTS FOR CUBES
+        
+        const spawn_cube_interval = 1; //Number of seconds between spawning cubes
+        const spawn_cube_interval_decrease = 0; //TODO maybe, increase cube spawn rate, currently doesn't work
+        
+        //x bounds for spawning cubes
+        const left_spawn_bound = -10;
+        const right_spawn_bound = 10;
+        //z position to spawn
+        const spawn_z = -20;
+
+        //y position for spawning, probably 0
+        const spawn_y = 0;
+
+        //z position to despawn at 
+        const despawn_z = 20; //change this to >20 to avoid the despawn while in frame
+        
+        const initial_cube_speed = 5; //speed of cubes going down
+        const cube_speed_acceperation = 0.1; //how much faster cubes go per seconds
+
+        const t = (program_state.animation_time - this.game_start_time)/1000;
+        const dt = program_state.animation_delta_time/1000;
+
+        //beginning cube creation and what not
+        //decide whether to spawn a new cube
+        if(t >= this.newcube_time) {
+            //spawn a new cube here and change time for new cube to be spawned
+            //random location between left and right bounds
+            let cube_spawn_location = Math.random() * (right_spawn_bound - left_spawn_bound) + left_spawn_bound;
+
+            //set the matrix for everything here and put it into our list of cube matricies
+
+            let new_cube_transform = model_transform.post_multiply(Mat4.translation(cube_spawn_location, spawn_y, spawn_z));
+            this.cube_array.push(new_cube_transform);
+
+            //increment new cubetime to prepare spawning new cube 
+            this.newcube_time = t + spawn_cube_interval;
+        }
+        
+
+        //draw cubes here
+        var i;
+        for(i = 0; i < this.cube_array.length; i++) {
+
+            //first check collisions, if collided then stop
+            if(this.collision_detection(this.player_position, this.cube_array[i])) {
+                //collision detected, abort
+                this.playing = 0;
+
+                //TODO LOSE CONDITION HERE
+            }
+            let new_cube_transform = this.cube_array[i].copy();
+
+            //scale the cube, this is why we need a copy, scaling after moving is a lot easier than dealing with the scaling
+            new_cube_transform = new_cube_transform.post_multiply(Mat4.scale(this.cube_size, this.cube_size, this.cube_size));
+            
+            //draw cube
+            this.shapes.cube.draw(context, program_state, new_cube_transform, this.materials.test.override({color: color(1, 1, 0, 1)}));
+            
+
+            //move the cube for the next loop
+            this.cube_array[i] = this.cube_array[i].post_multiply(Mat4.translation(0,0, (initial_cube_speed + cube_speed_acceperation * t) * dt));
+            
+            //delete cube if out of bounds
+            //apparently extracting a single element from a matrix is a pain, functionality should really be added to the library 
+
+            if(this.cube_array[i][2][3] > despawn_z) {
+                this.cube_array.splice(i, 1); //remove if out of bounds
+            }
+            
+        }
+        
+
 
     }
 
+    move_sphere(program_state) {
+        const dt = program_state.animation_delta_time/1000;
+        const x_bounds = 10; //bounds where the sphere can move left and right by, centered around x=0
+
+        const z_upper = 0; //upper z bound, say "upper" but less than lower since we view in -z direction, so decrease to increase
+        const z_lower = 10;
+        //bound won't be strict here, we just test if we already out of bounds, if a movement takes us further out of bounds we do not do it
+        if(this.move_right) {
+            if(this.player_position[0][3] < x_bounds) {
+                this.player_position = this.player_position.post_multiply(Mat4.translation(this.movement_amplitude * dt, 0, 0));
+            } 
+        }
+        if(this.move_left) {
+            if(this.player_position[0][3] > -x_bounds) {
+                this.player_position = this.player_position.post_multiply(Mat4.translation(-this.movement_amplitude * dt, 0, 0));
+            }
+        }
+
+        if(this.move_up) {
+            if(this.player_position[2][3] > z_upper) {
+                this.player_position = this.player_position.post_multiply(Mat4.translation(0, 0, -this.movement_amplitude * dt));
+            }
+        }
+        if(this.move_down) {
+            if(this.player_position[2][3] < z_lower) {
+                this.player_position = this.player_position.post_multiply(Mat4.translation(0, 0, this.movement_amplitude * dt));
+            }
+        }
+    }
+
+    collision_detection(sphere_matrix, cube_matrix) {
+        //extract positions for ease of use
+        let cube = vec3(cube_matrix[0][3], cube_matrix[1][3], cube_matrix[2][3]);
+        let sphere = vec3(sphere_matrix[0][3], sphere_matrix[1][3], sphere_matrix[2][3]);
+
+        //quick and dirty pythagorean theorem here to check if its close enough to require further checks
+
+        let deltax = cube[0] - sphere[0];
+        let deltay = cube[1] - sphere[1];
+        let deltaz = cube[2] - sphere[2];
+        
+
+        //checking if distance between two centers is greater than sphere_radius + sqrt(2) * cube_radius, in which case no collision possible
+        //quick and dirty, should rule out most objects
+        let maxdist = this.player_sphere_size + Math.sqrt(2) * this.cube_size;
+        if(deltax * deltax + deltay * deltay + deltaz * deltaz > maxdist * maxdist) {
+            return false;
+        }
+        
+        //now we do further checks
+        //source for general idea of this collision https://stackoverflow.com/questions/27517250/sphere-cube-collision-detection-in-opengl
+        //basically calculate point on sphere closest to cube center, and check if its inside. 
+
+        //these deltas act as rays between the sphere and cube center, so I can find this point by manipulating that
+
+        let delta = vec3(deltax, deltay, deltaz);
+
+        delta.normalize();
+
+        //scale by radius to find point
+
+        delta.scale_by(this.player_sphere_size);
+
+        let closestPoint = sphere.plus(delta);
+        let cubeRadius = this.cube_size;
+        //now check if we are within the cube
+        
+        //y checked last because y doesn't matter in this game 
+        if(cube[0] - cubeRadius < closestPoint[0] && cube[0] + cubeRadius > closestPoint[0] &&
+           cube[2] - cubeRadius < closestPoint[2] && cube[2] + cubeRadius > closestPoint[2] &&
+           cube[1] - cubeRadius < closestPoint[1] && cube[1] + cubeRadius > closestPoint[1]) {
+               return true;
+           }
+        return false;
+        
+
+    }
+
+    //TODO cousins, we really should cleanup this display function, looks wack
     display(context, program_state) {
         // display():  Called once per frame of animation.
         // Setup -- This part sets up the scene's overall camera matrix, projection matrix, and lights:
@@ -90,17 +285,22 @@ export class FinalProject extends Scene {
         program_state.projection_transform = Mat4.perspective(
             Math.PI / 4, context.width / context.height, .1, 1000);
 
-        // TODO: Lighting (Requirement 2)
         const t = program_state.animation_time / 1000, dt = program_state.animation_delta_time / 1000;
 
+
+        //fiat lux
         const light_position = vec4(0, 10, 5, 1);
         program_state.lights = [new Light(light_position, color(1, 1, 1, 1), 100)];
 
-        // TODO:  Fill in matrix operations and drawing code to draw the solar system scene (Requirements 3 and 4)
+        //begin placing things
         let model_transform = Mat4.identity();
         model_transform = model_transform.post_multiply(Mat4.translation(0, 0, 5));
+       
 
-        this.shapes.sphere.draw(context, program_state, model_transform, this.materials.test.override({color: color(1, 1, 0, 1)}));
+        //changed the sphere to spawn based on this.player_position
+        //going to move the sphere before anything
+        this.move_sphere(program_state);
+        this.shapes.sphere.draw(context, program_state, this.player_position, this.materials.test.override({color: color(1, 1, 0, 1)}));
 
         let cube_transform = Mat4.identity().post_multiply(Mat4.translation(0, -3, -5)).post_multiply(Mat4.scale(20, 2, 30));
         this.shapes.cube.draw(context, program_state, cube_transform, this.materials.test.override({color: color(1, 0, 0, 1)}));
@@ -110,7 +310,8 @@ export class FinalProject extends Scene {
         this.shapes.text.draw(context, program_state, scoreboard_transform, this.materials.text_image);
 
         if (this.playing) {
-            this.counter += 1;
+            this.cube_handler(context, program_state, Mat4.identity());
+            this.counter += 1; //TODO score currently tied to framerate, please use dt to detach it. 
             if (this.counter == 20) {
                 this.counter = 0;
                 this.score += 1;
@@ -118,6 +319,8 @@ export class FinalProject extends Scene {
         }
         else {
             this.score = 0;
+            this.game_start_time = program_state.animation_time; //just going to updat the animation_time here until the game starts so we have a start reference
+            //has to be done because game_start doesn't have access to program_state unfortunately 
         }
     }
 }
