@@ -119,7 +119,7 @@ export class FinalProject extends Scene {
     make_control_panel() {
         this.control_panel.innerHTML += "<b style='font-size:32px'>DEMETRI BALL</b>";
         this.new_line();
-        this.control_panel.innerHTML += "<p style = 'font-size: 16px'>Dodge the cubes and grab the golden cubes if possible.</p>"
+        this.control_panel.innerHTML += "<p style = 'font-size: 16px'>Dodge the cubes and grab the golden cubes if possible for some extra points.</p>"
         this.new_line();
         this.new_line();
 
